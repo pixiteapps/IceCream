@@ -127,11 +127,21 @@ extension DatabaseManager {
             case .chunk:
                 /// CloudKit says maximum number of items in a single request is 400.
                 /// So I think 300 should be fine by them.
-                print("chunk error")
-                let chunkedRecords = recordsToStore.chunkItUp(by: 300)
-                for chunk in chunkedRecords {
-                    self.syncRecordsToCloudKit(recordsToStore: chunk, recordIDsToDelete: recordIDsToDelete, completion: completion)
+                print("chunking - records to store : \(recordsToStore.count), records to delete : \(recordIDsToDelete.count)")
+                let chunkedToStoreRecords = recordsToStore.chunkItUp(by: 300)
+                for chunk in chunkedToStoreRecords {
+                    if chunk.count > 0 {
+                        self.syncRecordsToCloudKit(recordsToStore: chunk, recordIDsToDelete: [], completion: completion)
+                    }
                 }
+                
+                let chunkedDeleteRecords = recordIDsToDelete.chunkItUp(by: 300)
+                for chunk in chunkedDeleteRecords {
+                    if chunk.count > 0 {
+                        self.syncRecordsToCloudKit(recordsToStore: [], recordIDsToDelete: chunk, completion: completion)
+                    }
+                }
+                
             default:
                 return
             }
