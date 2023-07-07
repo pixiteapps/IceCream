@@ -21,7 +21,10 @@ public final class SyncObject<T, U, V, W> where T: Object & CKRecordConvertible 
     /// For more, reference is here: https://realm.io/docs/swift/latest/#notifications
     private var notificationToken: NotificationToken?
     
-    public var pipeToEngine: ((_ recordsToStore: [CKRecord], _ recordIDsToDelete: [CKRecord.ID]) -> ())?
+    public var pipeToEngine: ((_ recordsToStore: [CKRecord],
+                       _ recordIDsToDelete: [CKRecord.ID],
+                       _ completion: ((Error?) -> ())?)
+                               -> ())?
     
     public let realmConfiguration: Realm.Configuration
     
@@ -143,7 +146,7 @@ extension SyncObject: Syncable {
                     let recordIDsToDelete = modifications.filter { $0 < collection.count }.map { collection[$0] }.filter { $0.isDeleted }.map { $0.recordID }
                     
                     guard recordsToStore.count > 0 || recordIDsToDelete.count > 0 else { return }
-                    self.pipeToEngine?(recordsToStore, recordIDsToDelete)
+                    self.pipeToEngine?(recordsToStore, recordIDsToDelete, nil)
                 case .error(_):
                     break
                 }
@@ -175,10 +178,16 @@ extension SyncObject: Syncable {
         }
     }
     
+    public func deleteCloudKitRecords(completion: @escaping ((Error?) -> ())) {
+        let realm = try! Realm(configuration: self.realmConfiguration)
+        let recordsIDsToDelete: [CKRecord.ID] = realm.objects(T.self).filter { !$0.isDeleted }.map { $0.recordID }
+        pipeToEngine?([], recordsIDsToDelete, completion)
+    }
+    
     public func pushLocalObjectsToCloudKit() {
         let realm = try! Realm(configuration: self.realmConfiguration)
         let recordsToStore: [CKRecord] = realm.objects(T.self).filter { !$0.isDeleted }.map { $0.record }
-        pipeToEngine?(recordsToStore, [])
+        pipeToEngine?(recordsToStore, [], nil)
     }
     
 }

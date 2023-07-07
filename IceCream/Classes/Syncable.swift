@@ -31,8 +31,13 @@ public protocol Syncable: AnyObject {
     
     /// CloudKit related
     func pushLocalObjectsToCloudKit()
+    func deleteCloudKitRecords(completion: @escaping ((Error?) -> ()))
     
     /// Callback
-    var pipeToEngine: ((_ recordsToStore: [CKRecord], _ recordIDsToDelete: [CKRecord.ID]) -> ())? { get set }
+    var pipeToEngine: ((_ recordsToStore: [CKRecord],
+                       _ recordIDsToDelete: [CKRecord.ID],
+                       _ completion: ((Error?) -> ())?)
+                               -> ())? { get set }
+    
     
 }
