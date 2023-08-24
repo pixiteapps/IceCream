@@ -39,5 +39,4 @@ public protocol Syncable: AnyObject {
                        _ completion: ((Error?) -> ())?)
                                -> ())? { get set }
     
-    
 }
