@@ -30,8 +30,8 @@ public protocol Syncable: AnyObject {
     func resolvePendingRelationships()
     
     /// CloudKit related
-    func pushLocalObjectsToCloudKit()
-    func deleteCloudKitRecords(completion: @escaping ((Error?) -> ()))
+    func pushLocalObjectsToCloudKit(completion: ((Error?) -> ())?)
+    func deleteCloudKitRecords(completion: ((Error?) -> ())?)
     
     /// Callback
     var pipeToEngine: ((_ recordsToStore: [CKRecord],
