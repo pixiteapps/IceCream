@@ -178,13 +178,13 @@ extension SyncObject: Syncable {
         }
     }
     
-    public func deleteCloudKitRecords(completion: ((Error?) -> ())?) {
+    public func deleteCloudKitRecords(completion: ((Error?) -> ())? = nil) {
         let realm = try! Realm(configuration: self.realmConfiguration)
         let recordsIDsToDelete: [CKRecord.ID] = realm.objects(T.self).filter { !$0.isDeleted }.map { $0.recordID }
         pipeToEngine?([], recordsIDsToDelete, completion)
     }
     
-    public func pushLocalObjectsToCloudKit(completion: ((Error?) -> ())?) {
+    public func pushLocalObjectsToCloudKit(completion: ((Error?) -> ())? = nil) {
         let realm = try! Realm(configuration: self.realmConfiguration)
         let recordsToStore: [CKRecord] = realm.objects(T.self).filter { !$0.isDeleted }.map { $0.record }
         pipeToEngine?(recordsToStore, [], completion)
