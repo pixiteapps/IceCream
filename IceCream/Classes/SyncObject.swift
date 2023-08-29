@@ -84,6 +84,7 @@ extension SyncObject: Syncable {
     }
     
     public func add(record: CKRecord) {
+        print("^^ SyncObject add record : \(record)")
         BackgroundWorker.shared.start {
             let realm = try! Realm(configuration: self.realmConfiguration)
             guard let object = T.parseFromRecord(
@@ -114,6 +115,7 @@ extension SyncObject: Syncable {
     }
     
     public func delete(recordID: CKRecord.ID) {
+        print("^^ SyncObject delete record ID: \(recordID)")
         BackgroundWorker.shared.start {
             let realm = try! Realm(configuration: self.realmConfiguration)
             guard let object = realm.object(ofType: T.self, forPrimaryKey: T.primaryKeyForRecordID(recordID: recordID)) else {
