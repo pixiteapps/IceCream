@@ -80,7 +80,7 @@ extension SyncEngine {
     /// Push all existing local data to CloudKit
     /// You should NOT to call this method too frequently
     public func pushAll() {
-        databaseManager.syncObjects.forEach { $0.pushLocalObjectsToCloudKit() }
+        databaseManager.syncObjects.forEach { $0.pushLocalObjectsToCloudKit(completion: nil) }
     }
     
 }

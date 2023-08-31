@@ -45,9 +45,9 @@ extension DatabaseManager {
     
     func prepare() {
         syncObjects.forEach {
-            $0.pipeToEngine = { [weak self] recordsToStore, recordIDsToDelete in
+            $0.pipeToEngine = { [weak self] recordsToStore, recordIDsToDelete, completion in
                 guard let self = self else { return }
-                self.syncRecordsToCloudKit(recordsToStore: recordsToStore, recordIDsToDelete: recordIDsToDelete)
+                self.syncRecordsToCloudKit(recordsToStore: recordsToStore, recordIDsToDelete: recordIDsToDelete, completion: completion)
             }
         }
     }
