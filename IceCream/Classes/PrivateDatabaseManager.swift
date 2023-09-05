@@ -54,9 +54,10 @@ final class PrivateDatabaseManager: DatabaseManager {
                     self.databaseChangeToken = nil
                     self.fetchChangesInDatabase(callback)
                 default:
-                    return
+                    callback?(error)
                 }
             default:
+                callback?(error)
                 return
             }
         }
@@ -176,9 +177,11 @@ final class PrivateDatabaseManager: DatabaseManager {
                     syncObject.zoneChangesToken = nil
                     self.fetchChangesInZones(callback)
                 default:
+                    // could not recover, fetchRecordZoneChangesCompletionBlock will send back error
                     return
                 }
             default:
+                // could not retry/recover, fetchRecordZoneChangesCompletionBlock will send back error
                 return
             }
         }
@@ -188,7 +191,14 @@ final class PrivateDatabaseManager: DatabaseManager {
             self.syncObjects.forEach {
                 $0.resolvePendingRelationships()
             }
-            callback?(error)
+            
+            let errorResultType = ErrorHandler.shared.resultType(with: error)
+            if errorResultType.canRetry() {
+                print("should be retrying after getting error \(String(describing: error))")
+            } else {
+                // not recoverable, send back error
+                callback?(error)
+            }
         }
         
         database.add(changesOp)
@@ -241,6 +251,28 @@ extension PrivateDatabaseManager {
     @objc func cleanUp() {
         for syncObject in syncObjects {
             syncObject.cleanUp()
+        }
+    }
+}
+
+extension ErrorHandler.CKOperationResultType {
+    // these should be all the cases where we will retry an operation.
+    // currently, they are:
+    // 1. cloudkit tells us we can retry after a period of time
+    // 2. change token expired -- retry after resetting token
+    func canRetry() -> Bool {
+        switch self {
+            case .retry(_, _):
+                return true
+            case .recoverableError(let reason, _):
+                if case .changeTokenExpired = reason {
+                    return true
+                } else {
+                    // other errors are recoverable but the user needs to take action
+                    return false
+                }
+            default:
+                return false
         }
     }
 }
