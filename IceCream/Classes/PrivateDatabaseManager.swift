@@ -260,24 +260,3 @@ extension PrivateDatabaseManager {
     }
 }
 
-extension ErrorHandler.CKOperationResultType {
-    // these should be all the cases where we will retry an operation.
-    // currently, they are:
-    // 1. cloudkit tells us we can retry after a period of time
-    // 2. change token expired -- retry after resetting token
-    func canRetry() -> Bool {
-        switch self {
-            case .retry(_, _):
-                return true
-            case .recoverableError(let reason, _):
-                if case .changeTokenExpired = reason {
-                    return true
-                } else {
-                    // other errors are recoverable but the user needs to take action
-                    return false
-                }
-            default:
-                return false
-        }
-    }
-}
