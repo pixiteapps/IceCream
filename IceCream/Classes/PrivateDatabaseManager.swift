@@ -54,9 +54,10 @@ final class PrivateDatabaseManager: DatabaseManager {
                     self.databaseChangeToken = nil
                     self.fetchChangesInDatabase(callback)
                 default:
-                    return
+                    callback?(error)
                 }
             default:
+                callback?(error)
                 return
             }
         }
@@ -138,6 +139,9 @@ final class PrivateDatabaseManager: DatabaseManager {
         let changesOp = CKFetchRecordZoneChangesOperation(recordZoneIDs: zoneIds, optionsByRecordZoneID: zoneIdOptions)
         changesOp.fetchAllChanges = true
         
+        // if we retry fetch after getting a recoverable error
+        var isRetrying = false
+        
         changesOp.recordZoneChangeTokensUpdatedBlock = { [weak self] zoneId, token, _ in
             guard let self = self else { return }
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
@@ -166,19 +170,23 @@ final class PrivateDatabaseManager: DatabaseManager {
                 syncObject.zoneChangesToken = token
             case .retry(let timeToWait, _):
                 ErrorHandler.shared.retryOperationIfPossible(retryAfter: timeToWait, block: {
+                    isRetrying = true
                     self.fetchChangesInZones(callback)
                 })
             case .recoverableError(let reason, _):
                 switch reason {
                 case .changeTokenExpired:
-                    /// The previousServerChangeToken value is too old and the client must re-sync from scratch
+                    print("The previousServerChangeToken value is too old for zone id : \(zoneId) and the client must re-sync from scratch")
                     guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
                     syncObject.zoneChangesToken = nil
+                    isRetrying = true
                     self.fetchChangesInZones(callback)
                 default:
+                    // could not recover, fetchRecordZoneChangesCompletionBlock will send back error
                     return
                 }
             default:
+                // could not retry/recover, fetchRecordZoneChangesCompletionBlock will send back error
                 return
             }
         }
@@ -188,9 +196,16 @@ final class PrivateDatabaseManager: DatabaseManager {
             self.syncObjects.forEach {
                 $0.resolvePendingRelationships()
             }
-            callback?(error)
+            
+            print("fetchRecordZoneChangesCompletionBlock error : \(String(describing: error))")
+            if isRetrying {
+                print("^^ is retrying fetch")
+                isRetrying = false
+            } else {
+                callback?(error)
+            }
         }
-        
+                
         database.add(changesOp)
     }
 }
@@ -244,3 +259,4 @@ extension PrivateDatabaseManager {
         }
     }
 }
+
