@@ -12,6 +12,12 @@ import CloudKit
 /// https://developer.apple.com/documentation/cloudkit/ckerror.code
 
 struct ErrorHandler {
+
+    struct Constant {
+        // CloudKit says maximum number of items in a single request is 400.
+        // So let's use 300 to be conservative.
+        static let chunkSize = 300
+    }
     
     static let shared = ErrorHandler()
     
