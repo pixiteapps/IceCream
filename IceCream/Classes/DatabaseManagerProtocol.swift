@@ -126,6 +126,8 @@ extension DatabaseManager {
                 }
             case .chunk:
 
+                print("chunking - records to store : \(recordsToStore.count), records to delete : \(recordIDsToDelete.count)")
+
                 // chunk up the request and use dispatch groups to execute completion once all chunked requests have finished
                 let dispatchGroup = DispatchGroup()
                 var lastError : Error? = nil
