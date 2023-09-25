@@ -125,24 +125,42 @@ extension DatabaseManager {
                     self.syncRecordsToCloudKit(recordsToStore: recordsToStore, recordIDsToDelete: recordIDsToDelete, completion: completion)
                 }
             case .chunk:
-                /// CloudKit says maximum number of items in a single request is 400.
-                /// So I think 300 should be fine by them.
+
                 print("chunking - records to store : \(recordsToStore.count), records to delete : \(recordIDsToDelete.count)")
-                let chunkedToStoreRecords = recordsToStore.chunkItUp(by: 300)
-                for chunk in chunkedToStoreRecords {
-                    if chunk.count > 0 {
-                        self.syncRecordsToCloudKit(recordsToStore: chunk, recordIDsToDelete: [], completion: completion)
+
+                // chunk up the request and use dispatch groups to execute completion once all chunked requests have finished
+                let dispatchGroup = DispatchGroup()
+                var lastError : Error? = nil
+                
+                let chunkCompletion : ((Error?) -> ())? = { error in
+                    if let error = error {
+                        print("^^ error while chunking \(error)")
+                        lastError = error
                     }
+                    
+                    dispatchGroup.leave()
                 }
                 
-                let chunkedDeleteRecords = recordIDsToDelete.chunkItUp(by: 300)
-                for chunk in chunkedDeleteRecords {
-                    if chunk.count > 0 {
-                        self.syncRecordsToCloudKit(recordsToStore: [], recordIDsToDelete: chunk, completion: completion)
-                    }
+                let chunkedToStoreRecords = recordsToStore.chunkItUp(by: ErrorHandler.Constant.chunkSize)
+                let chunkedToDeleteRecordIDs = recordIDsToDelete.chunkItUp(by: ErrorHandler.Constant.chunkSize)
+
+                // send chunks of updates and deletes to cloudkit
+                let longerChunkedCount = max(chunkedToStoreRecords.count, chunkedToDeleteRecordIDs.count)
+                for index in 0..<longerChunkedCount {
+                    let updateChunk : [CKRecord] = index < chunkedToStoreRecords.count ? chunkedToStoreRecords[index] : []
+                    let deleteChunk : [CKRecord.ID] = index < chunkedToDeleteRecordIDs.count ? chunkedToDeleteRecordIDs[index] : []
+                    
+                    dispatchGroup.enter()
+                    self.syncRecordsToCloudKit(recordsToStore: updateChunk, recordIDsToDelete: deleteChunk, completion: chunkCompletion)
                 }
+                
+                dispatchGroup.notify(queue: DispatchQueue.global(qos: .background)) {
+                    completion?(lastError)
+                }
+            
                 
             default:
+                completion?(error)
                 return
             }
         }
