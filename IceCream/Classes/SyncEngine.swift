@@ -7,6 +7,11 @@
 
 import CloudKit
 
+public enum SyncEngineError : Error {
+   /// a non-available account status issue
+   case unhandledAccountStatus(CKAccountStatus)
+}
+
 /// SyncEngine talks to CloudKit directly.
 /// Logically,
 /// 1. it takes care of the operations of **CKDatabase**
@@ -44,6 +49,12 @@ public final class SyncEngine {
         databaseManager.prepare()
         databaseManager.container.accountStatus { [weak self] (status, error) in
             guard let self = self else { return }
+            
+            if let error = error {
+                self.initialFetchCompletion?(error)
+                return
+            }
+            
             switch status {
             case .available:
                 self.databaseManager.registerLocalDatabase()
@@ -60,12 +71,8 @@ public final class SyncEngine {
                 self.databaseManager.startObservingRemoteChanges()
                 self.databaseManager.startObservingTermination()
                 self.databaseManager.createDatabaseSubscriptionIfHaveNot()
-            case .temporarilyUnavailable:
-                break
-            case .couldNotDetermine:
-                break
-            @unknown default:
-                break
+            default:
+                self.initialFetchCompletion?(SyncEngineError.unhandledAccountStatus(status))
             }
         }
     }

@@ -62,6 +62,8 @@ final class PrivateDatabaseManager: DatabaseManager {
             }
         }
         
+        // upping service quality will trigger better error reporting e.g. internet disconnected will return error instead of just hanging...
+        changesOperation.qualityOfService = .userInitiated
         database.add(changesOperation)
     }
     
