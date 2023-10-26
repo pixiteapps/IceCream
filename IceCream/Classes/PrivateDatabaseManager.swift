@@ -149,13 +149,27 @@ final class PrivateDatabaseManager: DatabaseManager {
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
             syncObject.zoneChangesToken = token
         }
-        
-        changesOp.recordChangedBlock = { [weak self] record in
-            /// The Cloud will return the modified record since the last zoneChangesToken, we need to do local cache here.
-            /// Handle the record:
-            guard let self = self else { return }
-            guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
-            syncObject.add(record: record)
+        if #available(iOS 15, *) {
+            changesOp.recordWasChangedBlock = { [weak self] recordID, recordResult in
+                guard let self = self else { return }
+                switch recordResult {
+                case .failure(let error):
+                    print("^^ error processing record id \(recordID), error : \(error)")
+                case .success(let record):
+                    /// CloudKit will return the modified record since the last zoneChangesToken, we need to do local cache here.
+                    guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
+                    syncObject.add(record: record)
+                }
+            }
+        } else {
+            // deprecated as of ios 15
+            changesOp.recordChangedBlock = { [weak self] record in
+                /// The Cloud will return the modified record since the last zoneChangesToken, we need to do local cache here.
+                /// Handle the record:
+                guard let self = self else { return }
+                guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
+                syncObject.add(record: record)
+            }
         }
         
         changesOp.recordWithIDWasDeletedBlock = { [weak self] recordId, _ in
