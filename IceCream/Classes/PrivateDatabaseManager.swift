@@ -143,7 +143,9 @@ final class PrivateDatabaseManager: DatabaseManager {
         
         // if we retry fetch after getting a recoverable error
         var isRetrying = false
-        
+
+        print("^^ fetchChangesInZones started for operation : \(changesOp)")
+
         changesOp.recordZoneChangeTokensUpdatedBlock = { [weak self] zoneId, token, _ in
             guard let self = self else { return }
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
@@ -158,6 +160,7 @@ final class PrivateDatabaseManager: DatabaseManager {
                 case .success(let record):
                     /// CloudKit will return the modified record since the last zoneChangesToken, we need to do local cache here.
                     guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
+                    print("^^ fetchChangesInZones add record : \(record) in operation : \(changesOp)")
                     syncObject.add(record: record)
                 }
             }
@@ -175,14 +178,19 @@ final class PrivateDatabaseManager: DatabaseManager {
         changesOp.recordWithIDWasDeletedBlock = { [weak self] recordId, _ in
             guard let self = self else { return }
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == recordId.zoneID }) else { return }
+            print("^^ fetchChangesInZones delete record : \(recordId) in operation : \(changesOp)")
             syncObject.delete(recordID: recordId)
         }
         
         changesOp.recordZoneFetchCompletionBlock = { [weak self](zoneId ,token, _, _, error) in
             guard let self = self else { return }
+
+
             switch ErrorHandler.shared.resultType(with: error) {
             case .success:
                 guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
+                print("^^ recordZoneFetchCompletionBlock in operation : \(changesOp), token : \(String(describing: token))")
+                
                 syncObject.zoneChangesToken = token
             case .retry(let timeToWait, _):
                 ErrorHandler.shared.retryOperationIfPossible(retryAfter: timeToWait, block: {
@@ -213,7 +221,7 @@ final class PrivateDatabaseManager: DatabaseManager {
                 $0.resolvePendingRelationships()
             }
             
-            print("fetchRecordZoneChangesCompletionBlock error : \(String(describing: error))")
+            print("^^ fetchRecordZoneChangesCompletionBlock for operation : \(changesOp) error : \(String(describing: error))")
             if isRetrying {
                 print("^^ is retrying fetch")
                 isRetrying = false
