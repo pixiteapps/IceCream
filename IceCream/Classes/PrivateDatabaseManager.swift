@@ -12,6 +12,7 @@ import UIKit
 #endif
 
 import CloudKit
+import Combine
 
 final class PrivateDatabaseManager: DatabaseManager {
     
@@ -19,6 +20,8 @@ final class PrivateDatabaseManager: DatabaseManager {
     let database: CKDatabase
     
     let syncObjects: [Syncable]
+    
+    private var fetchNotificationCancellable: AnyCancellable?
     
     public init(objects: [Syncable], container: CKContainer) {
         self.syncObjects = objects
@@ -284,3 +287,21 @@ extension PrivateDatabaseManager {
     }
 }
 
+extension PrivateDatabaseManager {
+
+    ///
+    /// Will listen for cloudkit notifications and refresh the database with the latest changes.
+    /// Override default impl to throttle so many successive refreshes are not queued up unnecessarily. 
+    ///
+    func startObservingRemoteChanges() {
+
+        fetchNotificationCancellable = NotificationCenter.default
+            .publisher(for: Notifications.cloudKitDataDidChangeRemotely.name)
+            .throttle(for: 5.0, scheduler: DispatchQueue.global(qos: .utility), latest: true)
+            .sink() { [weak self] _ in
+                self?.fetchChangesInDatabase(nil)
+            }
+
+    }
+
+}
