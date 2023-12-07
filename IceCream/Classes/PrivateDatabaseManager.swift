@@ -297,7 +297,7 @@ extension PrivateDatabaseManager {
 
         fetchNotificationCancellable = NotificationCenter.default
             .publisher(for: Notifications.cloudKitDataDidChangeRemotely.name)
-            .throttle(for: 5.0, scheduler: DispatchQueue.global(qos: .utility), latest: true)
+            .throttle(for: 2.0, scheduler: DispatchQueue.global(qos: .utility), latest: true)
             .sink() { [weak self] _ in
                 self?.fetchChangesInDatabase(nil)
             }
