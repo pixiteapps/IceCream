@@ -12,6 +12,7 @@ import UIKit
 #endif
 
 import CloudKit
+import Combine
 
 final class PrivateDatabaseManager: DatabaseManager {
     
@@ -19,6 +20,8 @@ final class PrivateDatabaseManager: DatabaseManager {
     let database: CKDatabase
     
     let syncObjects: [Syncable]
+    
+    private var fetchNotificationCancellable: AnyCancellable?
     
     public init(objects: [Syncable], container: CKContainer) {
         self.syncObjects = objects
@@ -143,32 +146,54 @@ final class PrivateDatabaseManager: DatabaseManager {
         
         // if we retry fetch after getting a recoverable error
         var isRetrying = false
-        
+
+        print("^^ fetchChangesInZones started for operation : \(changesOp)")
+
         changesOp.recordZoneChangeTokensUpdatedBlock = { [weak self] zoneId, token, _ in
             guard let self = self else { return }
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
             syncObject.zoneChangesToken = token
         }
-        
-        changesOp.recordChangedBlock = { [weak self] record in
-            /// The Cloud will return the modified record since the last zoneChangesToken, we need to do local cache here.
-            /// Handle the record:
-            guard let self = self else { return }
-            guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
-            syncObject.add(record: record)
+        if #available(iOS 15, *) {
+            changesOp.recordWasChangedBlock = { [weak self] recordID, recordResult in
+                guard let self = self else { return }
+                switch recordResult {
+                case .failure(let error):
+                    print("^^ error processing record id \(recordID), error : \(error)")
+                case .success(let record):
+                    /// CloudKit will return the modified record since the last zoneChangesToken, we need to do local cache here.
+                    guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
+                    print("^^ fetchChangesInZones add record : \(record) in operation : \(changesOp)")
+                    syncObject.add(record: record)
+                }
+            }
+        } else {
+            // deprecated as of ios 15
+            changesOp.recordChangedBlock = { [weak self] record in
+                /// The Cloud will return the modified record since the last zoneChangesToken, we need to do local cache here.
+                /// Handle the record:
+                guard let self = self else { return }
+                guard let syncObject = self.syncObjects.first(where: { $0.recordType == record.recordType }) else { return }
+                syncObject.add(record: record)
+            }
         }
         
         changesOp.recordWithIDWasDeletedBlock = { [weak self] recordId, _ in
             guard let self = self else { return }
             guard let syncObject = self.syncObjects.first(where: { $0.zoneID == recordId.zoneID }) else { return }
+            print("^^ fetchChangesInZones delete record : \(recordId) in operation : \(changesOp)")
             syncObject.delete(recordID: recordId)
         }
         
         changesOp.recordZoneFetchCompletionBlock = { [weak self](zoneId ,token, _, _, error) in
             guard let self = self else { return }
+
+
             switch ErrorHandler.shared.resultType(with: error) {
             case .success:
                 guard let syncObject = self.syncObjects.first(where: { $0.zoneID == zoneId }) else { return }
+                print("^^ recordZoneFetchCompletionBlock in operation : \(changesOp), token : \(String(describing: token))")
+                
                 syncObject.zoneChangesToken = token
             case .retry(let timeToWait, _):
                 ErrorHandler.shared.retryOperationIfPossible(retryAfter: timeToWait, block: {
@@ -199,7 +224,7 @@ final class PrivateDatabaseManager: DatabaseManager {
                 $0.resolvePendingRelationships()
             }
             
-            print("fetchRecordZoneChangesCompletionBlock error : \(String(describing: error))")
+            print("^^ fetchRecordZoneChangesCompletionBlock for operation : \(changesOp) error : \(String(describing: error))")
             if isRetrying {
                 print("^^ is retrying fetch")
                 isRetrying = false
@@ -262,3 +287,21 @@ extension PrivateDatabaseManager {
     }
 }
 
+extension PrivateDatabaseManager {
+
+    ///
+    /// Will listen for cloudkit notifications and refresh the database with the latest changes.
+    /// Override default impl to throttle so many successive refreshes are not queued up unnecessarily. 
+    ///
+    func startObservingRemoteChanges() {
+
+        fetchNotificationCancellable = NotificationCenter.default
+            .publisher(for: Notifications.cloudKitDataDidChangeRemotely.name)
+            .throttle(for: 2.0, scheduler: DispatchQueue.global(qos: .utility), latest: true)
+            .sink() { [weak self] _ in
+                self?.fetchChangesInDatabase(nil)
+            }
+
+    }
+
+}
