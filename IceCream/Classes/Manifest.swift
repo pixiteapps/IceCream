@@ -29,7 +29,7 @@ internal func print(_ items: Any..., separator: String = " ", terminator: String
         repeat {
             //Swift.print(items[i], separator: separator, terminator: i == (items.endIndex - 1) ? terminator : separator)
             // redirect logging to PixiteLogging so we can have our custom logging to files
-            plog(.info, items[i])
+            plog(.info, String(describing:items[i]))
             i += 1
         } while i < items.endIndex
     }
