@@ -15,15 +15,19 @@ let package = Package(
         .package(
             url: "https://github.com/realm/realm-swift",
             from: "10.40.0"
-        )
+        ),
+        .package(
+            url: "git@github.com:pixiteapps/PixiteLogging",
+            from: "0.1.0"),
+        
     ],
     targets: [
         .target(
             name: "IceCream",
             dependencies: [
                 .product(name: "RealmSwift", package: "realm-swift"),
-                .product(name: "Realm", package: "realm-swift")
-                
+                .product(name: "Realm", package: "realm-swift"),
+                "PixiteLogging"
             ],
             path: "IceCream",
             sources: ["Classes"])

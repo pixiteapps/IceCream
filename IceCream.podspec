@@ -28,6 +28,6 @@ Pod::Spec.new do |s|
   s.public_header_files = ["IceCream/IceCream.h"]
   s.static_framework = true
   s.swift_version = '5.0'
-
+  s.dependency 'PixiteLogging'
   s.dependency 'RealmSwift', '~> 10.40'
 end
