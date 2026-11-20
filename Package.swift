@@ -13,8 +13,8 @@ let package = Package(
     ],
     dependencies: [
         .package(
-            url: "https://github.com/realm/realm-swift",
-            from: "10.42.2"
+            url: "https://github.com/pixiteapps/realm-swift.git",
+            exact: "10.54.5-pixite-spm"
         )
     ],
     targets: [
